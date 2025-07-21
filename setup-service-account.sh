@@ -36,6 +36,7 @@ echo -e "${YELLOW}🔧 Enabling required APIs...${NC}"
 gcloud services enable cloudbuild.googleapis.com
 gcloud services enable run.googleapis.com
 gcloud services enable containerregistry.googleapis.com
+gcloud services enable artifactregistry.googleapis.com
 gcloud services enable iam.googleapis.com
 
 # Check if service account already exists
@@ -76,6 +77,11 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:${SA_EMAIL}" \
     --role="roles/storage.objectAdmin"
+
+# Artifact Registry permissions (required for --source deployment)
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/artifactregistry.admin"
 
 # Create service account key
 echo -e "${YELLOW}🗝️  Creating service account key...${NC}"
