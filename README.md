@@ -2,7 +2,7 @@
 
 RetireChat is a Streamlit-based AI-powered retirement planning coach that provides personalized retirement planning advice, goals, and action plans.
 
-Deploy
+Deploy.
 
 ## Features
 
