@@ -83,6 +83,11 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:${SA_EMAIL}" \
     --role="roles/artifactregistry.admin"
 
+# Service Usage Consumer permissions (required for Cloud Build)
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/serviceusage.serviceUsageConsumer"
+
 # Create service account key
 echo -e "${YELLOW}🗝️  Creating service account key...${NC}"
 gcloud iam service-accounts keys create $KEY_FILE \
