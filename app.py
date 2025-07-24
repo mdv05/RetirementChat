@@ -292,19 +292,19 @@ def get_ai_response(user_input, conversation_history, user_profile):
         safety_settings = [
             {
                 "category": "HARM_CATEGORY_HARASSMENT",
-                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                "threshold": "BLOCK_ONLY_HIGH"
             },
             {
                 "category": "HARM_CATEGORY_HATE_SPEECH",
-                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                "threshold": "BLOCK_ONLY_HIGH"
             },
             {
                 "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                "threshold": "BLOCK_ONLY_HIGH"
             },
             {
                 "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                "threshold": "BLOCK_ONLY_HIGH"
             }
         ]
         
@@ -317,61 +317,151 @@ def get_ai_response(user_input, conversation_history, user_profile):
             safety_settings=safety_settings
         )
         
-        # Check if response was blocked
-        if response.candidates and response.candidates[0].finish_reason == 2:
-            return """I apologize, but I need to rephrase my response. Let me provide you with some general retirement planning guidance:
-
-**Personalized Retirement Planning Steps:**
-
-1. **Assessment**: Based on your profile, let's review your current savings rate and timeline.
-
-2. **Goal Setting**: With your target retirement age, we can calculate how much you need to save monthly.
-
-3. **Investment Strategy**: Given your risk tolerance, I can recommend appropriate investment allocations.
-
-4. **Action Plan**: 
-   - Immediate: Review and optimize current contributions
-   - Next 3 months: Set up automatic savings increases
-   - Next 6 months: Diversify investment portfolio
-   - Ongoing: Annual reviews and adjustments
-
-Could you ask me about a specific aspect of retirement planning? For example:
-- "How much should I save monthly for retirement?"
-- "What investment mix is right for my age?"
-- "How can I catch up on retirement savings?"
-
-This will help me provide more targeted advice for your situation."""
+        # Check response structure thoroughly
+        if not response.candidates:
+            return generate_fallback_response(user_input, user_profile)
         
-        # Return the response text if available
-        if response.text:
-            return response.text
-        else:
-            return "I'm having trouble generating a complete response. Could you try asking about a specific aspect of retirement planning instead?"
+        candidate = response.candidates[0]
+        
+        # Check if response was blocked (finish_reason = 2 means SAFETY)
+        if candidate.finish_reason == 2:
+            return generate_fallback_response(user_input, user_profile)
+        
+        # Check if response has valid parts
+        if not candidate.content or not candidate.content.parts:
+            return generate_fallback_response(user_input, user_profile)
+        
+        # Try to access the text safely
+        try:
+            if response.text and response.text.strip():
+                return response.text
+            else:
+                return generate_fallback_response(user_input, user_profile)
+        except:
+            return generate_fallback_response(user_input, user_profile)
             
     except Exception as e:
         # Enhanced error handling with helpful fallback
-        if "finish_reason" in str(e) or "safety" in str(e).lower():
-            return """I apologize, but I need to approach your question differently. Let me provide some general retirement planning guidance:
-
-**Key Retirement Planning Areas:**
-
-🎯 **Savings Strategy**: Most experts recommend saving 10-15% of your income for retirement.
-
-📊 **Investment Allocation**: Your investment mix should align with your age and risk tolerance.
-
-⏰ **Timeline Planning**: The earlier you start, the more compound interest works in your favor.
-
-💡 **Action Steps**: Start with maximizing any employer 401(k) match, then consider additional savings.
-
-**Let's focus on specifics - what would you like to explore?**
-- Savings rate calculations
-- Investment strategy for your age
-- Debt management while saving
-- Social Security planning
-
-This will help me give you more targeted advice for your situation."""
+        if "finish_reason" in str(e) or "safety" in str(e).lower() or "Invalid operation" in str(e):
+            return generate_fallback_response(user_input, user_profile)
         else:
-            return f"I'm experiencing a technical issue connecting to the AI service. Please try refreshing the page or asking your question in a different way. Error details: {str(e)[:100]}"
+            return f"I'm experiencing a technical issue. Please try refreshing the page. Error: {str(e)[:50]}..."
+
+def generate_fallback_response(user_input, user_profile):
+    """Generate a helpful fallback response when AI is blocked"""
+    
+    # Analyze the user input to provide relevant fallback
+    input_lower = user_input.lower()
+    
+    if any(word in input_lower for word in ["plan", "planning", "detailed", "strategy"]):
+        return f"""Based on your profile, here's a personalized retirement planning framework:
+
+**Your Current Situation:**
+- Age: {user_profile.get('age', 'Not specified')}
+- Income Range: {user_profile.get('annual_income', 'Not specified')}
+- Current Savings: {user_profile.get('current_savings', 'Not specified')}
+- Target Retirement: Age {user_profile.get('target_retirement_age', 'Not specified')}
+
+**Recommended Action Steps:**
+
+**Immediate (This Month):**
+- Review your current retirement account contributions
+- Calculate if you're on track for your target retirement age
+- Ensure you're getting any available employer match
+
+**Next 3 Months:**
+- Increase contributions by 1-2% if possible
+- Review and optimize your investment allocation
+- Set up automatic annual contribution increases
+
+**Next 6-12 Months:**
+- Consider opening additional retirement accounts (IRA, Roth IRA)
+- Review beneficiaries on all accounts
+- Evaluate your overall debt strategy
+
+**Ongoing:**
+- Annual review of retirement goals and progress
+- Adjust contributions with salary increases
+- Monitor investment performance and rebalance as needed
+
+Would you like me to elaborate on any specific aspect of this plan?"""
+    
+    elif any(word in input_lower for word in ["save", "saving", "contribution", "money"]):
+        income = user_profile.get('annual_income', 'your income level')
+        return f"""**Savings Guidance for Your Situation:**
+
+**Based on your profile:**
+- Income: {income}
+- Current savings: {user_profile.get('current_savings', 'Not specified')}
+
+**General Savings Recommendations:**
+- Aim to save 10-15% of your income for retirement
+- Start with getting full employer 401(k) match
+- Consider the "pay yourself first" approach with automatic deductions
+
+**Monthly Savings Targets by Income:**
+- $30K-50K: $250-625/month
+- $50K-75K: $417-937/month  
+- $75K-100K: $625-1,250/month
+- $100K+: 10-15% of gross income
+
+**Next Steps:**
+1. Calculate your current savings rate
+2. Identify areas to reduce expenses
+3. Set up automatic transfers to retirement accounts
+
+What specific aspect of savings would you like to explore further?"""
+    
+    elif any(word in input_lower for word in ["invest", "investment", "portfolio", "risk"]):
+        risk_tolerance = user_profile.get('risk_tolerance', 'moderate')
+        age = user_profile.get('age', 35)
+        
+        return f"""**Investment Strategy for Your Profile:**
+
+**Your Details:**
+- Age: {age}
+- Risk Tolerance: {risk_tolerance}
+
+**General Asset Allocation Guidelines:**
+- **Conservative**: 70% bonds, 30% stocks
+- **Moderate**: 60% stocks, 40% bonds  
+- **Aggressive**: 80% stocks, 20% bonds
+
+**Age-Based Rule of Thumb:**
+- Stock allocation = 100 - your age
+- At age {age}: Consider roughly {100-age}% stocks, {age}% bonds
+
+**Low-Cost Investment Options:**
+- Target-date funds (automatically adjusts over time)
+- Index funds (broad market exposure, low fees)
+- ETFs (exchange-traded funds)
+
+**Key Principles:**
+- Diversification across asset classes
+- Keep investment fees low (under 0.5%)
+- Don't try to time the market
+- Regular rebalancing (annually)
+
+Would you like more details about any of these investment approaches?"""
+    
+    else:
+        return """I'd be happy to help with your retirement planning question! Here are some areas I can assist with:
+
+**Popular Topics:**
+🎯 **Retirement Planning**: Create a personalized savings strategy
+💰 **Savings Goals**: Calculate how much to save monthly
+📊 **Investment Strategy**: Portfolio allocation for your age and risk tolerance
+📈 **Catch-Up Planning**: Strategies if you're behind on savings
+🏥 **Healthcare Costs**: Planning for medical expenses in retirement
+📋 **Social Security**: Understanding benefits and timing
+
+**Try asking:**
+- "How much should I save each month for retirement?"
+- "What's the best investment mix for someone my age?"
+- "How can I catch up on retirement savings?"
+- "What are my Social Security benefits likely to be?"
+
+What specific aspect of retirement planning would you like to explore?"""
 
 def show_onboarding_form():
     """Display the onboarding form to collect user profile information"""
