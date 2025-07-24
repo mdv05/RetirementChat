@@ -237,13 +237,15 @@ def create_optimized_prompt(user_profile, user_input):
     savings = user_profile.get('current_savings', 'starting out')
     risk = user_profile.get('risk_tolerance', 'moderate')
     
-    prompt = f"""You are a retirement planning expert. User profile: {age}yr, {income} income, {savings} saved, {risk} risk tolerance.
+    prompt = f"""You are a financial planning expert helping with retirement and general financial questions.
 
-User question: {user_input}
+User profile: {age} years old, {income} income, {savings} saved, {risk} risk tolerance.
 
-Provide specific, actionable retirement advice. Be direct and helpful. Include numbers when relevant.
+User question: "{user_input}"
 
-Keep response under 300 words and focus on practical next steps."""
+Provide specific, actionable financial advice that directly answers their question. If it's about budgeting, give actual budget categories and amounts. If it's about debt, give specific strategies. Be practical and helpful.
+
+Keep response under 400 words and focus on answering their specific question."""
     
     return prompt
 
@@ -293,7 +295,98 @@ def get_smart_fallback(user_input, user_profile):
     age = user_profile.get('age', 30)
     income = user_profile.get('annual_income', 'Not specified')
     
-    # Quick keyword-based responses
+    # Budget and expense questions
+    if any(word in input_lower for word in ['budget', 'monthly', 'rent', 'expenses', 'spend', 'bills']):
+        income_range = income.replace('Under ', '').replace('Over ', '').replace('$', '').replace(',', '')
+        
+        if 'under 50' in income.lower() or '50,000' in income:
+            monthly_income = "$3,000-4,000"
+            rent_max = "$1,200"
+            food = "$400"
+            transport = "$300"
+            retirement = "$300"
+        elif '50,000 - 75,000' in income:
+            monthly_income = "$4,200-6,200"
+            rent_max = "$1,500"
+            food = "$500"
+            transport = "$400"
+            retirement = "$500"
+        elif '75,000 - 100,000' in income:
+            monthly_income = "$6,200-8,300"
+            rent_max = "$2,000"
+            food = "$600"
+            transport = "$500"
+            retirement = "$700"
+        else:
+            monthly_income = "$8,300+"
+            rent_max = "$2,500+"
+            food = "$700"
+            transport = "$600"
+            retirement = "$1,000+"
+        
+        return f"""**Monthly Budget Plan for Age {age}**
+
+**Estimated Monthly Income:** {monthly_income}
+
+**Essential Expenses (50-60%):**
+- Rent/Housing: {rent_max} max (30% of income)
+- Food: {food}
+- Transportation: {transport}
+- Utilities: $150-200
+- Insurance: $200-300
+
+**Student Loans & Debt (10-20%):**
+- Student loan payments: Pay minimums first
+- Extra payments: Focus on highest interest rates
+- Target: Pay off before age 30 if possible
+
+**Savings & Retirement (20%):**
+- Emergency fund: $1,000 starter, then 3-6 months expenses
+- Retirement (401k/IRA): {retirement}
+- Get employer match first!
+
+**Flexible Spending (10-20%):**
+- Entertainment, shopping, hobbies
+
+**Quick Tips:**
+- Use 50/30/20 rule: needs/wants/savings
+- Pay student loan minimums, then max employer 401k match
+- Build $1,000 emergency fund before extra debt payments
+
+Need help with specific numbers or categories?"""
+    
+    # Student loan and debt questions
+    if any(word in input_lower for word in ['student loan', 'debt', 'loans', 'pay off', 'payment']):
+        return f"""**Student Loan Strategy for Age {age}**
+
+**Payment Priority Order:**
+1. **Pay minimums** on all loans
+2. **Get employer 401k match** (free money!)
+3. **Pay extra** on highest interest rate loans first
+4. **Build emergency fund** ($1,000 minimum)
+
+**Specific Strategy:**
+- **Federal loans:** Often 4-6% interest
+- **Private loans:** Usually higher rates - pay these first
+- **Income-driven plans:** Consider if payments are high
+
+**Monthly Approach:**
+- List all loans with balances and rates
+- Pay minimums on all
+- Put any extra toward highest rate loan
+- Don't skip retirement savings completely
+
+**Timeline Goal:**
+- Aim to pay off by age 30
+- Balance loan payments with retirement savings
+- Don't sacrifice employer match for loans under 5% interest
+
+**Quick Math:**
+At age {age}, every $1,000 you put in retirement grows to ~$20,000 by retirement. Balance this with loan interest rates.
+
+What are your loan interest rates? This affects the strategy."""
+    
+    # Quick keyword-based responses for retirement questions
     if any(word in input_lower for word in ['roth', 'hsa', '401k', 'account']):
         return f"""**Account Priority for Age {age}:**
 1. **401(k) match** - Free money first
@@ -328,21 +421,46 @@ Next step: Check if your employer offers HSA and 401(k) match."""
 
 **DIY approach:** Low-cost index funds (total stock market + bond index)."""
     
-    return f"""**Quick Retirement Guidance:**
+    # Emergency fund questions
+    if any(word in input_lower for word in ['emergency', 'fund', 'savings account']):
+        return f"""**Emergency Fund for Age {age}:**
+
+**Starter Goal:** $1,000 in savings account
+**Full Goal:** 3-6 months of expenses
+
+**Priority Order:**
+1. Save $1,000 emergency fund first
+2. Get employer 401(k) match
+3. Pay off high-interest debt (>6%)
+4. Build full emergency fund
+5. More retirement savings
+
+**Where to keep it:**
+- High-yield savings account (3-5% interest)
+- Keep it separate from checking
+- Don't invest emergency funds
+
+**Monthly target:** Save $100-200/month until you reach your goal."""
+    
+    # Default response for unmatched questions
+    return f"""**Let me help with your specific question**
 
 **Your profile:** Age {age}, Income {income}
 
-**Top priorities:**
-1. Get full employer 401(k) match
-2. Save 10-15% of income total
-3. Use age-appropriate investments
+I want to give you a specific answer. Could you clarify:
 
-**Need specifics?** Ask about:
-- "How much should I save?"
-- "Roth IRA or 401k?"
-- "What investments for my age?"
+**For budgeting:** What's your monthly income and main expenses?
+**For debt:** What loans do you have and their interest rates?
+**For saving:** How much are you currently saving monthly?
+**For investing:** What accounts do you currently have?
 
-What's your most pressing retirement question?"""
+**Common questions I can help with:**
+- "Create a monthly budget for my income"
+- "Should I pay off student loans or save for retirement?"
+- "How much emergency fund do I need?"
+- "What's the best account for my situation?"
+
+What specific financial question can I help you with?"""
 
 def show_streamlined_form():
     """Streamlined onboarding form with only essential questions"""
