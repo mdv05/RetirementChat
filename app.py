@@ -353,7 +353,45 @@ def generate_fallback_response(user_input, user_profile):
     # Analyze the user input to provide relevant fallback
     input_lower = user_input.lower()
     
-    if any(word in input_lower for word in ["plan", "planning", "detailed", "strategy"]):
+    # Check for specific account type questions first (more specific)
+    if any(phrase in input_lower for phrase in ["roth ira", "hsa", "401k", "403b", "ira", "account type", "where should i invest"]):
+        age = user_profile.get('age', 25)
+        income = user_profile.get('annual_income', 'Not specified')
+        return f"""**Account Selection Strategy for Your Profile**
+
+**Your Situation:**
+- Age: {age}
+- Income: {income}
+
+**Recommended Priority Order:**
+
+**1. Employer 401(k) Match (Top Priority)**
+- Contribute enough to get full employer match first
+- This is free money - typically 50-100% return
+
+**2. HSA (If Available)**
+- Triple tax advantage: deductible, grows tax-free, tax-free withdrawals for medical
+- At age {age}, great for long-term retirement savings
+- Can invest funds after reaching minimum balance
+
+**3. Roth IRA vs Traditional IRA**
+- **Roth IRA**: Better if you expect higher tax rates in retirement
+- **Traditional IRA**: Better if you need the tax deduction now
+- At age {age}, Roth often makes more sense due to time for tax-free growth
+
+**4. Additional 401(k) Contributions**
+- After maxing HSA and IRA, return to 401(k)
+- Consider Roth 401(k) option if available
+
+**For Your Specific Question:**
+If choosing between Roth IRA and HSA:
+- **Choose HSA first** if you have high-deductible health plan
+- **Choose Roth IRA** if no HSA option available
+- Ideally, contribute to both if possible
+
+What's your specific situation with employer benefits?"""
+    
+    elif any(word in input_lower for word in ["plan", "planning", "detailed", "strategy"]):
         return f"""**Personalized Retirement Planning Framework**
 
 **Your Current Profile:**
@@ -386,7 +424,7 @@ def generate_fallback_response(user_input, user_profile):
 
 Would you like me to elaborate on any specific aspect of this plan?"""
     
-    elif any(word in input_lower for word in ["save", "saving", "contribution", "money"]):
+    elif any(word in input_lower for word in ["save", "saving", "contribution", "money", "how much"]):
         income = user_profile.get('annual_income', 'your income level')
         return f"""**Savings Strategy for Your Profile**
 
@@ -412,7 +450,7 @@ Would you like me to elaborate on any specific aspect of this plan?"""
 
 What specific aspect of savings strategy would you like to explore further?"""
     
-    elif any(word in input_lower for word in ["invest", "investment", "portfolio", "risk"]):
+    elif any(word in input_lower for word in ["allocation", "portfolio", "stocks", "bonds", "mix"]):
         risk_tolerance = user_profile.get('risk_tolerance', 'moderate')
         age = user_profile.get('age', 35)
         
@@ -453,15 +491,16 @@ Here are the key areas I can help you with:
 🎯 **Retirement Strategy**: Personalized savings and investment approach
 💰 **Savings Goals**: Calculate optimal monthly contributions
 📊 **Investment Allocation**: Portfolio mix for your age and risk tolerance
+🏦 **Account Selection**: Roth IRA vs Traditional IRA vs HSA vs 401(k)
 📈 **Catch-Up Planning**: Strategies if you're behind on savings
 🏥 **Healthcare Planning**: Medical expense preparation
 📋 **Social Security**: Benefits optimization and timing
 
 **Popular Questions:**
+- "Should I invest in a Roth IRA or HSA?"
 - "How much should I save each month for retirement?"
 - "What's the best investment mix for someone my age?"
 - "How can I catch up on retirement savings?"
-- "What are my Social Security benefits likely to be?"
 
 What specific aspect of retirement planning would you like to explore?"""
 
