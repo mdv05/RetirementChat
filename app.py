@@ -228,495 +228,207 @@ st.markdown("""
 
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-def create_retirement_prompt_with_profile(user_profile):
-    """Create a personalized prompt based on user profile data"""
-    base_prompt = """You are an expert Retirement Planning Coach providing personalized advice.
-
-USER CONTEXT:"""
+def create_optimized_prompt(user_profile, user_input):
+    """Create a focused, efficient prompt for better AI responses"""
     
-    if user_profile:
-        # Create a more concise profile summary to avoid safety filter issues
-        profile_summary = []
-        
-        if user_profile.get('age'):
-            profile_summary.append(f"Age {user_profile['age']}")
-        if user_profile.get('career_stage'):
-            profile_summary.append(f"Career: {user_profile['career_stage']}")
-        if user_profile.get('annual_income'):
-            profile_summary.append(f"Income: {user_profile['annual_income']}")
-        if user_profile.get('current_savings'):
-            profile_summary.append(f"Current savings: {user_profile['current_savings']}")
-        if user_profile.get('target_retirement_age'):
-            profile_summary.append(f"Target retirement age: {user_profile['target_retirement_age']}")
-        if user_profile.get('risk_tolerance'):
-            profile_summary.append(f"Risk tolerance: {user_profile['risk_tolerance']}")
-        if user_profile.get('primary_goals'):
-            goals = user_profile['primary_goals'][:100]  # Limit length
-            profile_summary.append(f"Goals: {goals}")
-        
-        base_prompt += f"\n{', '.join(profile_summary[:6])}"  # Limit to 6 key items
+    # Extract key profile elements
+    age = user_profile.get('age', 30)
+    income = user_profile.get('annual_income', 'mid-range')
+    savings = user_profile.get('current_savings', 'starting out')
+    risk = user_profile.get('risk_tolerance', 'moderate')
     
-    base_prompt += """
+    prompt = f"""You are a retirement planning expert. User profile: {age}yr, {income} income, {savings} saved, {risk} risk tolerance.
 
-INSTRUCTIONS:
-- Provide personalized retirement planning advice based on the user context above
-- Give specific, actionable recommendations
-- Reference their age, income, and goals when relevant
-- Be encouraging and professional
-- Include credible sources when discussing financial concepts
-- Ask clarifying questions if you need more specific information
+User question: {user_input}
 
-KNOWLEDGE SOURCES:
-- Segal Benefits: https://2025-benefits.segalco.com/
-- PSCA News: https://www.psca.org/news/psca-news/
-"""
+Provide specific, actionable retirement advice. Be direct and helpful. Include numbers when relevant.
+
+Keep response under 300 words and focus on practical next steps."""
     
-    return base_prompt
+    return prompt
 
 def get_ai_response(user_input, conversation_history, user_profile):
     try:
         model = genai.GenerativeModel('gemini-2.5-flash')
         
-        # Build conversation context with simplified profile
-        context = create_retirement_prompt_with_profile(user_profile) + "\n\nCONVERSATION:\n"
+        # Use optimized, shorter prompt
+        prompt = create_optimized_prompt(user_profile, user_input)
         
-        # Keep only last 5 messages to avoid token limits
-        recent_history = conversation_history[-5:] if conversation_history else []
-        for msg in recent_history:
-            role = "User" if msg["role"] == "user" else "Assistant"
-            context += f"{role}: {msg['content'][:200]}...\n"  # Limit message length
+        # Only include last 2 messages for context (reduce token usage)
+        if conversation_history:
+            recent_context = conversation_history[-2:]
+            context_str = "\n".join([f"{msg['role']}: {msg['content'][:100]}" for msg in recent_context])
+            prompt += f"\n\nRecent context: {context_str}"
         
-        context += f"\nUser: {user_input}\nAssistant:"
-        
-        # Add safety settings to handle potential blocks
-        safety_settings = [
-            {
-                "category": "HARM_CATEGORY_HARASSMENT",
-                "threshold": "BLOCK_ONLY_HIGH"
-            },
-            {
-                "category": "HARM_CATEGORY_HATE_SPEECH",
-                "threshold": "BLOCK_ONLY_HIGH"
-            },
-            {
-                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                "threshold": "BLOCK_ONLY_HIGH"
-            },
-            {
-                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-                "threshold": "BLOCK_ONLY_HIGH"
-            }
-        ]
-        
+        # Optimized generation settings for speed
         response = model.generate_content(
-            context,
+            prompt,
             generation_config=genai.types.GenerationConfig(
-                max_output_tokens=800,  # Reduced to avoid issues
-                temperature=0.7,
+                max_output_tokens=400,  # Shorter responses for speed
+                temperature=0.3,  # Lower temperature for more focused responses
             ),
-            safety_settings=safety_settings
+            safety_settings=[
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}
+            ]
         )
         
-        # Check response structure thoroughly
-        if not response.candidates:
-            return generate_fallback_response(user_input, user_profile)
-        
-        candidate = response.candidates[0]
-        
-        # Check if response was blocked (finish_reason = 2 means SAFETY)
-        if candidate.finish_reason == 2:
-            return generate_fallback_response(user_input, user_profile)
-        
-        # Check if response has valid parts
-        if not candidate.content or not candidate.content.parts:
-            return generate_fallback_response(user_input, user_profile)
-        
-        # Try to access the text safely
-        try:
-            if response.text and response.text.strip():
-                return response.text
-            else:
-                return generate_fallback_response(user_input, user_profile)
-        except:
-            return generate_fallback_response(user_input, user_profile)
+        # Faster response validation
+        if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+            try:
+                return response.text.strip() if response.text else get_smart_fallback(user_input, user_profile)
+            except:
+                return get_smart_fallback(user_input, user_profile)
+        else:
+            return get_smart_fallback(user_input, user_profile)
             
     except Exception as e:
-        # Enhanced error handling with helpful fallback
-        if "finish_reason" in str(e) or "safety" in str(e).lower() or "Invalid operation" in str(e):
-            return generate_fallback_response(user_input, user_profile)
-        else:
-            return f"I'm experiencing a technical issue. Please try refreshing the page. Error: {str(e)[:50]}..."
+        return get_smart_fallback(user_input, user_profile)
 
-def generate_fallback_response(user_input, user_profile):
-    """Generate a helpful fallback response when AI is blocked"""
-    
-    # Analyze the user input to provide relevant fallback
+def get_smart_fallback(user_input, user_profile):
+    """Quick, targeted fallback responses based on keywords"""
     input_lower = user_input.lower()
+    age = user_profile.get('age', 30)
+    income = user_profile.get('annual_income', 'Not specified')
     
-    # Check for specific account type questions first (more specific)
-    if any(phrase in input_lower for phrase in ["roth ira", "hsa", "401k", "403b", "ira", "account type", "where should i invest"]):
-        age = user_profile.get('age', 25)
-        income = user_profile.get('annual_income', 'Not specified')
-        return f"""**Account Selection Strategy for Your Profile**
+    # Quick keyword-based responses
+    if any(word in input_lower for word in ['roth', 'hsa', '401k', 'account']):
+        return f"""**Account Priority for Age {age}:**
+1. **401(k) match** - Free money first
+2. **HSA** - Triple tax advantage (if available)
+3. **Roth IRA** - Tax-free growth (good at age {age})
+4. **More 401(k)** - Additional savings
 
-**Your Situation:**
-- Age: {age}
-- Income: {income}
+**Quick decision:** If choosing between Roth IRA and HSA, pick HSA if you have a high-deductible health plan, otherwise Roth IRA.
 
-**Recommended Priority Order:**
-
-**1. Employer 401(k) Match (Top Priority)**
-- Contribute enough to get full employer match first
-- This is free money - typically 50-100% return
-
-**2. HSA (If Available)**
-- Triple tax advantage: deductible, grows tax-free, tax-free withdrawals for medical
-- At age {age}, great for long-term retirement savings
-- Can invest funds after reaching minimum balance
-
-**3. Roth IRA vs Traditional IRA**
-- **Roth IRA**: Better if you expect higher tax rates in retirement
-- **Traditional IRA**: Better if you need the tax deduction now
-- At age {age}, Roth often makes more sense due to time for tax-free growth
-
-**4. Additional 401(k) Contributions**
-- After maxing HSA and IRA, return to 401(k)
-- Consider Roth 401(k) option if available
-
-**For Your Specific Question:**
-If choosing between Roth IRA and HSA:
-- **Choose HSA first** if you have high-deductible health plan
-- **Choose Roth IRA** if no HSA option available
-- Ideally, contribute to both if possible
-
-What's your specific situation with employer benefits?"""
+Next step: Check if your employer offers HSA and 401(k) match."""
     
-    elif any(word in input_lower for word in ["plan", "planning", "detailed", "strategy"]):
-        return f"""**Personalized Retirement Planning Framework**
+    if any(word in input_lower for word in ['save', 'much', 'percent']):
+        return f"""**Savings Target for Age {age}:**
+- **Minimum:** 10% of income to retirement accounts
+- **Better:** 15% including employer match
+- **Income:** {income}
 
-**Your Current Profile:**
-- Age: {user_profile.get('age', 'Not specified')}
-- Income Range: {user_profile.get('annual_income', 'Not specified')}
-- Current Savings: {user_profile.get('current_savings', 'Not specified')}
-- Target Retirement: Age {user_profile.get('target_retirement_age', 'Not specified')}
+**Action steps:**
+1. Start with employer 401(k) match
+2. Increase by 1% every year
+3. Automate contributions
 
-**Action Plan Timeline:**
-
-**Immediate (This Month):**
-- Review your current retirement account contributions
-- Calculate if you're on track for your target retirement age
-- Ensure you're getting any available employer match
-
-**Next 3 Months:**
-- Increase contributions by 1-2% if possible
-- Review and optimize your investment allocation
-- Set up automatic annual contribution increases
-
-**Next 6-12 Months:**
-- Consider opening additional retirement accounts (IRA, Roth IRA)
-- Review beneficiaries on all accounts
-- Evaluate your overall debt strategy
-
-**Ongoing Strategy:**
-- Annual review of retirement goals and progress
-- Adjust contributions with salary increases
-- Monitor investment performance and rebalance as needed
-
-Would you like me to elaborate on any specific aspect of this plan?"""
+**Rule of thumb:** Try to have 1x your salary saved by age 30, 3x by 40."""
     
-    elif any(word in input_lower for word in ["save", "saving", "contribution", "money", "how much"]):
-        income = user_profile.get('annual_income', 'your income level')
-        return f"""**Savings Strategy for Your Profile**
+    if any(word in input_lower for word in ['invest', 'portfolio', 'stocks']):
+        stock_percent = min(90, 100 - age)
+        return f"""**Investment Mix for Age {age}:**
+- **Stocks:** ~{stock_percent}%
+- **Bonds:** ~{100-stock_percent}%
 
-**Your Current Situation:**
-- Income: {income}
-- Current savings: {user_profile.get('current_savings', 'Not specified')}
+**Simple approach:** Use target-date funds in your 401(k) - they automatically adjust over time.
 
-**Recommended Savings Approach:**
-- Aim to save 10-15% of your income for retirement
-- Start with getting full employer 401(k) match
-- Use the "pay yourself first" approach with automatic deductions
-
-**Monthly Savings Targets by Income:**
-- $30K-50K: $250-625/month
-- $50K-75K: $417-937/month  
-- $75K-100K: $625-1,250/month
-- $100K+: 10-15% of gross income
-
-**Implementation Steps:**
-1. Calculate your current savings rate
-2. Identify areas to reduce expenses
-3. Set up automatic transfers to retirement accounts
-
-What specific aspect of savings strategy would you like to explore further?"""
+**DIY approach:** Low-cost index funds (total stock market + bond index)."""
     
-    elif any(word in input_lower for word in ["allocation", "portfolio", "stocks", "bonds", "mix"]):
-        risk_tolerance = user_profile.get('risk_tolerance', 'moderate')
-        age = user_profile.get('age', 35)
-        
-        return f"""**Investment Strategy for Your Profile**
+    return f"""**Quick Retirement Guidance:**
 
-**Your Investment Profile:**
-- Age: {age}
-- Risk Tolerance: {risk_tolerance}
+**Your profile:** Age {age}, Income {income}
 
-**Recommended Asset Allocation:**
-- **Conservative**: 70% bonds, 30% stocks
-- **Moderate**: 60% stocks, 40% bonds  
-- **Aggressive**: 80% stocks, 20% bonds
+**Top priorities:**
+1. Get full employer 401(k) match
+2. Save 10-15% of income total
+3. Use age-appropriate investments
 
-**Age-Based Allocation Rule:**
-- Stock allocation = 100 - your age
-- At age {age}: Consider roughly {100-age}% stocks, {age}% bonds
+**Need specifics?** Ask about:
+- "How much should I save?"
+- "Roth IRA or 401k?"
+- "What investments for my age?"
 
-**Best Investment Options:**
-- Target-date funds (automatically adjusts over time)
-- Index funds (broad market exposure, low fees)
-- ETFs (exchange-traded funds)
+What's your most pressing retirement question?"""
 
-**Key Investment Principles:**
-- Diversification across asset classes
-- Keep investment fees low (under 0.5%)
-- Avoid trying to time the market
-- Regular rebalancing (annually)
-
-Would you like more details about any of these investment approaches?"""
-    
-    else:
-        return """**Retirement Planning Guidance**
-
-Here are the key areas I can help you with:
-
-**Core Planning Topics:**
-🎯 **Retirement Strategy**: Personalized savings and investment approach
-💰 **Savings Goals**: Calculate optimal monthly contributions
-📊 **Investment Allocation**: Portfolio mix for your age and risk tolerance
-🏦 **Account Selection**: Roth IRA vs Traditional IRA vs HSA vs 401(k)
-📈 **Catch-Up Planning**: Strategies if you're behind on savings
-🏥 **Healthcare Planning**: Medical expense preparation
-📋 **Social Security**: Benefits optimization and timing
-
-**Popular Questions:**
-- "Should I invest in a Roth IRA or HSA?"
-- "How much should I save each month for retirement?"
-- "What's the best investment mix for someone my age?"
-- "How can I catch up on retirement savings?"
-
-What specific aspect of retirement planning would you like to explore?"""
-
-def show_onboarding_form():
-    """Display the onboarding form to collect user profile information"""
+def show_streamlined_form():
+    """Streamlined onboarding form with only essential questions"""
     st.markdown("""
     <div class="main-header">
         <h1>Welcome to RetireChat</h1>
-        <p>Let's create your personalized retirement planning profile</p>
+        <p>Quick profile setup for personalized advice</p>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("""
     <div class="form-container">
-        <h3 style="color: #1f4e79; margin-top: 0;">Personal Retirement Assessment</h3>
-        <p>Please fill out this form so I can provide you with personalized retirement planning advice. All information is kept confidential and used only to tailor recommendations to your specific situation.</p>
+        <h3 style="color: #1f4e79; margin-top: 0;">Quick Retirement Profile</h3>
+        <p>Just 6 key questions to get personalized advice:</p>
     </div>
     """, unsafe_allow_html=True)
     
-    with st.form("retirement_profile_form"):
+    with st.form("quick_profile_form"):
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown('<div class="form-section"><h4>👤 Personal Information</h4>', unsafe_allow_html=True)
-            age = st.number_input("Current Age", min_value=18, max_value=100, value=35)
-            career_stage = st.selectbox("Career Stage", [
-                "Early Career (0-5 years experience)",
-                "Mid-Career (5-15 years experience)", 
-                "Senior Career (15+ years experience)",
-                "Near Retirement (5 years or less)",
-                "Already Retired"
-            ])
-            employment_status = st.selectbox("Employment Status", [
-                "Full-time Employee",
-                "Part-time Employee",
-                "Self-employed/Freelancer",
-                "Business Owner",
-                "Unemployed",
-                "Retired"
-            ])
-            family_status = st.selectbox("Family Status", [
-                "Single, no dependents",
-                "Married/Partnered, no children",
-                "Married/Partnered with children",
-                "Single parent",
-                "Supporting elderly parents",
-                "Other"
-            ])
-            st.markdown('</div>', unsafe_allow_html=True)
+            age = st.number_input("Your Age", min_value=18, max_value=80, value=30)
             
-            st.markdown('<div class="form-section"><h4>💰 Financial Information</h4>', unsafe_allow_html=True)
             annual_income = st.selectbox("Annual Income", [
-                "Under $30,000",
-                "$30,000 - $50,000",
-                "$50,000 - $75,000",
+                "Under $50,000",
+                "$50,000 - $75,000", 
                 "$75,000 - $100,000",
                 "$100,000 - $150,000",
-                "$150,000 - $250,000",
-                "Over $250,000"
+                "Over $150,000"
             ])
+            
             current_savings = st.selectbox("Current Retirement Savings", [
-                "No savings yet",
-                "Under $10,000",
-                "$10,000 - $50,000",
-                "$50,000 - $100,000",
-                "$100,000 - $250,000",
-                "$250,000 - $500,000",
-                "$500,000 - $1,000,000",
-                "Over $1,000,000"
+                "Just starting ($0-$10K)",
+                "Getting started ($10K-$50K)",
+                "Building up ($50K-$150K)",
+                "Well established ($150K+)"
             ])
-            monthly_contributions = st.selectbox("Monthly Retirement Contributions", [
-                "Not contributing yet",
-                "Under $200",
-                "$200 - $500",
-                "$500 - $1,000",
-                "$1,000 - $2,000",
-                "Over $2,000"
-            ])
-            st.markdown('</div>', unsafe_allow_html=True)
         
         with col2:
-            st.markdown('<div class="form-section"><h4>🎯 Goals & Timeline</h4>', unsafe_allow_html=True)
             target_retirement_age = st.number_input("Target Retirement Age", min_value=50, max_value=80, value=65)
-            target_savings = st.selectbox("Target Retirement Savings Goal", [
-                "Not sure yet",
-                "$500,000 - $1,000,000",
-                "$1,000,000 - $2,000,000",
-                "$2,000,000 - $5,000,000",
-                "Over $5,000,000"
-            ])
-            primary_goals = st.multiselect("Primary Retirement Goals", [
-                "Maintain current lifestyle",
-                "Travel extensively",
-                "Support family/children",
-                "Start a business",
-                "Volunteer/charity work",
-                "Healthcare security",
-                "Leave an inheritance",
-                "Early retirement"
-            ])
-            st.markdown('</div>', unsafe_allow_html=True)
             
-            st.markdown('<div class="form-section"><h4>📊 Experience & Risk</h4>', unsafe_allow_html=True)
-            investment_experience = st.selectbox("Investment Experience", [
-                "Beginner - little to no experience",
-                "Basic - some knowledge of investments",
-                "Intermediate - moderate experience",
-                "Advanced - extensive experience"
+            risk_tolerance = st.selectbox("Investment Risk Comfort", [
+                "Conservative (safety first)",
+                "Moderate (balanced approach)",
+                "Aggressive (growth focused)"
             ])
-            risk_tolerance = st.selectbox("Risk Tolerance", [
-                "Conservative - prefer stable, low-risk investments",
-                "Moderate - willing to accept some risk for potential growth",
-                "Aggressive - comfortable with high-risk, high-reward investments"
+            
+            main_goal = st.selectbox("Top Retirement Priority", [
+                "Start saving regularly",
+                "Increase current savings",
+                "Optimize investments",
+                "Catch up on savings",
+                "Plan for early retirement"
             ])
-            current_debt = st.selectbox("Current Debt Level", [
-                "No significant debt",
-                "Some credit card debt",
-                "Student loans",
-                "Mortgage only",
-                "Multiple debts (credit cards, loans, etc.)",
-                "High debt burden"
-            ])
-            st.markdown('</div>', unsafe_allow_html=True)
         
-        st.markdown('<div class="form-section"><h4>🤔 Challenges & Concerns</h4>', unsafe_allow_html=True)
-        main_challenges = st.multiselect("Main Retirement Planning Challenges", [
-            "Don't know where to start",
-            "Not saving enough",
-            "Understanding investment options",
-            "Balancing current expenses with saving",
-            "Managing debt while saving",
-            "Healthcare costs in retirement",
-            "Social Security uncertainty",
-            "Market volatility concerns",
-            "Inflation impact",
-            "Estate planning"
-        ])
-        additional_info = st.text_area("Additional Information or Specific Questions", 
-                                     placeholder="Any other details about your situation or specific questions you'd like addressed...")
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        submitted = st.form_submit_button("Create My Retirement Profile", use_container_width=True)
+        submitted = st.form_submit_button("Get Personalized Advice", use_container_width=True)
         
         if submitted:
-            # Store profile in session state
+            # Store simplified profile
             st.session_state.user_profile = {
                 'age': age,
-                'career_stage': career_stage,
-                'employment_status': employment_status,
-                'family_status': family_status,
                 'annual_income': annual_income,
                 'current_savings': current_savings,
-                'monthly_contributions': monthly_contributions,
                 'target_retirement_age': target_retirement_age,
-                'target_savings': target_savings,
-                'primary_goals': ', '.join(primary_goals) if primary_goals else 'Not specified',
-                'investment_experience': investment_experience,
                 'risk_tolerance': risk_tolerance,
-                'current_debt': current_debt,
-                'main_challenges': ', '.join(main_challenges) if main_challenges else 'Not specified',
-                'additional_info': additional_info
+                'main_goal': main_goal
             }
             st.session_state.profile_complete = True
-            st.success("✅ Profile created successfully! You can now start chatting with your AI retirement coach.")
+            st.success("✅ Profile ready! Ask me anything about retirement planning.")
             st.rerun()
 
-def show_profile_summary(user_profile):
-    """Display a summary of the user's profile"""
-    st.markdown("""
+def show_quick_profile_summary(user_profile):
+    """Compact profile display"""
+    st.markdown(f"""
     <div class="profile-summary">
-        <h4 style="color: #1f4e79; margin-top: 0;">📋 Your Retirement Profile</h4>
+        <h4 style="color: #1f4e79; margin-top: 0;">📋 Your Profile</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+            <div><strong>Age:</strong> {user_profile.get('age', 'N/A')}</div>
+            <div><strong>Target Retirement:</strong> {user_profile.get('target_retirement_age', 'N/A')}</div>
+            <div><strong>Income:</strong> {user_profile.get('annual_income', 'N/A')}</div>
+            <div><strong>Savings:</strong> {user_profile.get('current_savings', 'N/A')}</div>
+            <div><strong>Risk:</strong> {user_profile.get('risk_tolerance', 'N/A')}</div>
+            <div><strong>Goal:</strong> {user_profile.get('main_goal', 'N/A')}</div>
+        </div>
+    </div>
     """, unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown(f"""
-        <div class="profile-item">
-            <span class="profile-label">Age:</span>
-            <span class="profile-value">{user_profile.get('age', 'N/A')}</span>
-        </div>
-        <div class="profile-item">
-            <span class="profile-label">Career Stage:</span>
-            <span class="profile-value">{user_profile.get('career_stage', 'N/A')}</span>
-        </div>
-        <div class="profile-item">
-            <span class="profile-label">Current Savings:</span>
-            <span class="profile-value">{user_profile.get('current_savings', 'N/A')}</span>
-        </div>
-        <div class="profile-item">
-            <span class="profile-label">Monthly Contributions:</span>
-            <span class="profile-value">{user_profile.get('monthly_contributions', 'N/A')}</span>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown(f"""
-        <div class="profile-item">
-            <span class="profile-label">Target Retirement Age:</span>
-            <span class="profile-value">{user_profile.get('target_retirement_age', 'N/A')}</span>
-        </div>
-        <div class="profile-item">
-            <span class="profile-label">Target Savings:</span>
-            <span class="profile-value">{user_profile.get('target_savings', 'N/A')}</span>
-        </div>
-        <div class="profile-item">
-            <span class="profile-label">Risk Tolerance:</span>
-            <span class="profile-value">{user_profile.get('risk_tolerance', 'N/A')}</span>
-        </div>
-        <div class="profile-item">
-            <span class="profile-label">Investment Experience:</span>
-            <span class="profile-value">{user_profile.get('investment_experience', 'N/A')}</span>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
 
 def main():
     # Initialize session state
@@ -732,9 +444,9 @@ def main():
     if "user_profile" not in st.session_state:
         st.session_state.user_profile = {}
     
-    # Show onboarding form if profile not complete
+    # Show streamlined onboarding if needed
     if not st.session_state.profile_complete:
-        show_onboarding_form()
+        show_streamlined_form()
         return
     
     # Navigation Bar
@@ -743,9 +455,8 @@ def main():
         <div class="nav-logo">💰 RetireChat</div>
         <div class="nav-links">
             <a href="#" class="nav-link">Dashboard</a>
-            <a href="#" class="nav-link">Planning Tools</a>
+            <a href="#" class="nav-link">Tools</a>
             <a href="#" class="nav-link">Resources</a>
-            <a href="#" class="nav-link">Support</a>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -753,8 +464,8 @@ def main():
     # Main Header
     st.markdown("""
     <div class="main-header">
-        <h1>AI Retirement Planning Coach</h1>
-        <p>Delivering personalized advice based on your retirement profile</p>
+        <h1>AI Retirement Coach</h1>
+        <p>Fast, personalized retirement planning advice</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -765,18 +476,19 @@ def main():
         # Chat Interface
         st.markdown("""
         <div class="feature-card">
-            <h3>🤖 AI Retirement Planning Assistant</h3>
-            <p>Get personalized answers based on your retirement profile and goals</p>
+            <h3>🤖 Ask Your Retirement Questions</h3>
+            <p>Get specific advice based on your profile</p>
         </div>
         """, unsafe_allow_html=True)
         
-        # Chat messages
-        for message in st.session_state.messages:
+        # Chat messages (limit display to last 6 for performance)
+        recent_messages = st.session_state.messages[-6:] if len(st.session_state.messages) > 6 else st.session_state.messages
+        for message in recent_messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
         
         # Chat input
-        prompt = st.chat_input("Ask me about retirement planning, financial goals, or career development...")
+        prompt = st.chat_input("Ask about retirement savings, investments, accounts...")
         
         if prompt:
             st.session_state.messages.append({"role": "user", "content": prompt})
@@ -784,60 +496,57 @@ def main():
                 st.markdown(prompt)
             
             with st.chat_message("assistant"):
-                with st.spinner("Analyzing your question based on your profile..."):
+                with st.spinner("Getting advice..."):
                     response = get_ai_response(prompt, st.session_state.conversation_history, st.session_state.user_profile)
                     st.markdown(response)
             
             st.session_state.messages.append({"role": "assistant", "content": response})
+            # Keep conversation history smaller for performance
             st.session_state.conversation_history.append({"role": "user", "content": prompt})
             st.session_state.conversation_history.append({"role": "assistant", "content": response})
+            
+            # Limit history to last 10 messages for performance
+            if len(st.session_state.conversation_history) > 10:
+                st.session_state.conversation_history = st.session_state.conversation_history[-10:]
     
     with col2:
-        # Profile Summary
-        show_profile_summary(st.session_state.user_profile)
+        # Quick profile summary
+        show_quick_profile_summary(st.session_state.user_profile)
         
         # Update Profile Button
         if st.button("✏️ Update Profile", use_container_width=True):
             st.session_state.profile_complete = False
             st.rerun()
         
-        # Quick Actions
-        st.markdown("### Quick Start Guides")
+        # Quick Actions - more specific
+        st.markdown("### Quick Questions")
         
-        if st.button("🎯 Personalized Retirement Plan", use_container_width=True):
-            st.session_state.suggested_prompt = "Based on my profile, create a detailed personalized retirement plan with specific action steps."
+        if st.button("💰 How much should I save?", use_container_width=True):
+            st.session_state.suggested_prompt = "How much should I be saving for retirement given my age and income?"
         
-        if st.button("📈 Investment Strategy", use_container_width=True):
-            st.session_state.suggested_prompt = "Given my risk tolerance and goals, what investment strategy would you recommend?"
+        if st.button("🏦 Which account should I use?", use_container_width=True):
+            st.session_state.suggested_prompt = "Should I prioritize 401k, Roth IRA, or HSA for my situation?"
         
-        if st.button("💰 Savings Optimization", use_container_width=True):
-            st.session_state.suggested_prompt = "How can I optimize my current savings and contributions based on my income and goals?"
+        if st.button("📊 What investments for my age?", use_container_width=True):
+            st.session_state.suggested_prompt = "What's the right investment mix for someone my age?"
         
-        if st.button("🔮 Retirement Projections", use_container_width=True):
-            st.session_state.suggested_prompt = "Show me projections of my retirement readiness and what adjustments I might need to make."
+        if st.button("🚀 How to catch up?", use_container_width=True):
+            st.session_state.suggested_prompt = "I'm behind on retirement savings. What's the best strategy to catch up?"
         
-        # Stats
-        st.markdown("""
+        # Progress stats
+        messages_count = len([msg for msg in st.session_state.messages if msg["role"] == "user"])
+        st.markdown(f"""
         <div class="feature-card">
             <h3>📊 Your Progress</h3>
             <div class="stat-card">
-                <p class="stat-number">{}</p>
+                <p class="stat-number">{messages_count}</p>
                 <p class="stat-label">Questions Asked</p>
             </div>
-        </div>
-        """.format(len([msg for msg in st.session_state.messages if msg["role"] == "user"])), unsafe_allow_html=True)
-        
-        # Resources
-        st.markdown("""
-        <div class="feature-card">
-            <h3>🔗 Trusted Resources</h3>
-            <p><a href="https://2025-benefits.segalco.com/" target="_blank" style="color: #1f4e79;">Segal Benefits Portal</a></p>
-            <p><a href="https://www.psca.org/news/psca-news/" target="_blank" style="color: #1f4e79;">PSCA Financial News</a></p>
         </div>
         """, unsafe_allow_html=True)
         
         # Clear conversation
-        if st.button("🗑️ Clear Conversation", use_container_width=True):
+        if st.button("🗑️ Clear Chat", use_container_width=True):
             st.session_state.conversation_history = []
             st.session_state.messages = []
             st.rerun()
@@ -852,7 +561,7 @@ def main():
             st.markdown(prompt)
         
         with st.chat_message("assistant"):
-            with st.spinner("Analyzing your question based on your profile..."):
+            with st.spinner("Getting advice..."):
                 response = get_ai_response(prompt, st.session_state.conversation_history, st.session_state.user_profile)
                 st.markdown(response)
         
@@ -861,17 +570,11 @@ def main():
         st.session_state.conversation_history.append({"role": "assistant", "content": response})
         st.rerun()
     
-    # Footer
+    # Simplified footer
     st.markdown("""
     <div class="footer">
         <h4>💰 RetireChat</h4>
-        <p>Delivering trusted retirement planning advice powered by AI technology.</p>
-        <p style="font-size: 0.9rem; opacity: 0.7;">
-            © 2025 RetireChat. All rights reserved. | 
-            <a href="#" style="color: #1f4e79;">Privacy Policy</a> | 
-            <a href="#" style="color: #1f4e79;">Terms of Service</a> | 
-            <a href="#" style="color: #1f4e79;">Contact Support</a>
-        </p>
+        <p>Fast, personalized retirement planning advice powered by AI</p>
     </div>
     """, unsafe_allow_html=True)
 
