@@ -295,6 +295,69 @@ def get_smart_fallback(user_input, user_profile):
     age = user_profile.get('age', 30)
     income = user_profile.get('annual_income', 'Not specified')
     
+    # Retirement planning questions
+    if any(phrase in input_lower for phrase in ['retirement plan', 'long term plan', 'retirement strategy', 'plan for retirement', 'retirement roadmap', 'retirement steps']):
+        target_age = user_profile.get('target_retirement_age', 65)
+        years_to_retirement = target_age - age
+        
+        if age <= 25:
+            monthly_target = "$200-400"
+            milestone_30 = "1x annual salary"
+            milestone_40 = "3x annual salary"
+        elif age <= 35:
+            monthly_target = "$400-800"
+            milestone_30 = "1x annual salary"
+            milestone_40 = "3x annual salary"
+        else:
+            monthly_target = "$800-1,500"
+            milestone_30 = "1x annual salary (catch up needed)"
+            milestone_40 = "3x annual salary"
+        
+        return f"""**Long-Term Retirement Plan for Age {age}**
+
+**Your Timeline:** {years_to_retirement} years until retirement at {target_age}
+
+**Phase 1: Foundation (Ages {age}-30)**
+- **Goal:** Build retirement saving habit
+- **Target:** Save {monthly_target}/month
+- **Priority:** Get full employer 401(k) match
+- **Milestone:** Have {milestone_30} saved by age 30
+- **Accounts:** 401(k) for match, then Roth IRA
+
+**Phase 2: Acceleration (Ages 30-40)**
+- **Goal:** Increase savings rate to 15-20%
+- **Target:** Max Roth IRA ($7,000/year), increase 401(k)
+- **Milestone:** Have {milestone_40} saved by age 40
+- **Focus:** Career growth to increase income
+
+**Phase 3: Optimization (Ages 40-50)**
+- **Goal:** Max retirement accounts
+- **Target:** $22,500 to 401(k), $7,000 to Roth IRA
+- **Milestone:** Have 6x annual salary saved
+- **Strategy:** Consider additional investments
+
+**Phase 4: Pre-Retirement (Ages 50-{target_age})**
+- **Goal:** Catch-up contributions, reduce risk
+- **Target:** Max savings with catch-up limits
+- **Milestone:** 10x annual salary by retirement
+- **Prep:** Plan withdrawal strategy
+
+**Investment Strategy by Age:**
+- **Ages {age}-30:** 90% stocks, 10% bonds (aggressive growth)
+- **Ages 30-40:** 80% stocks, 20% bonds
+- **Ages 40-50:** 70% stocks, 30% bonds
+- **Ages 50+:** Gradually shift to 60% stocks, 40% bonds
+
+**Action Steps This Year:**
+1. Start contributing to employer 401(k) for match
+2. Open Roth IRA if no employer plan
+3. Automate monthly contributions
+4. Invest in target-date funds or index funds
+
+**Rule of Thumb:** Save 10-15% of income consistently, starting now. Time is your biggest advantage at age {age}!
+
+What part of this plan would you like me to explain further?"""
+    
     # Budget and expense questions
     if any(word in input_lower for word in ['budget', 'monthly', 'rent', 'expenses', 'spend', 'bills']):
         income_range = income.replace('Under ', '').replace('Over ', '').replace('$', '').replace(',', '')
@@ -386,40 +449,63 @@ At age {age}, every $1,000 you put in retirement grows to ~$20,000 by retirement
 
 What are your loan interest rates? This affects the strategy."""
     
-    # Quick keyword-based responses for retirement questions
-    if any(word in input_lower for word in ['roth', 'hsa', '401k', 'account']):
-        return f"""**Account Priority for Age {age}:**
-1. **401(k) match** - Free money first
-2. **HSA** - Triple tax advantage (if available)
-3. **Roth IRA** - Tax-free growth (good at age {age})
-4. **More 401(k)** - Additional savings
-
-**Quick decision:** If choosing between Roth IRA and HSA, pick HSA if you have a high-deductible health plan, otherwise Roth IRA.
-
-Next step: Check if your employer offers HSA and 401(k) match."""
-    
-    if any(word in input_lower for word in ['save', 'much', 'percent']):
+    # Savings and investment questions
+    if any(word in input_lower for word in ['save', 'saving', 'much', 'percent', 'how much']):
         return f"""**Savings Target for Age {age}:**
 - **Minimum:** 10% of income to retirement accounts
 - **Better:** 15% including employer match
 - **Income:** {income}
 
+**Monthly Breakdown:**
+- Emergency fund: $100-200/month until $1,000 saved
+- Retirement: 10-15% of gross income
+- If income is $40K: Save $333-500/month total
+
 **Action steps:**
 1. Start with employer 401(k) match
-2. Increase by 1% every year
-3. Automate contributions
+2. Build $1,000 emergency fund
+3. Increase retirement by 1% every year
+4. Automate all savings
 
-**Rule of thumb:** Try to have 1x your salary saved by age 30, 3x by 40."""
+**Milestones by Age:**
+- Age 30: 1x annual salary saved
+- Age 40: 3x annual salary saved
+- Age 50: 6x annual salary saved
+
+**Rule of thumb:** At age {age}, time is your biggest advantage. Even small amounts grow significantly over time."""
     
-    if any(word in input_lower for word in ['invest', 'portfolio', 'stocks']):
+    # Account and investment allocation questions
+    if any(word in input_lower for word in ['roth', 'hsa', '401k', 'account', 'invest', 'portfolio', 'stocks', 'allocation']):
         stock_percent = min(90, 100 - age)
-        return f"""**Investment Mix for Age {age}:**
+        
+        return f"""**Complete Investment Strategy for Age {age}:**
+
+**Account Priority:**
+1. **401(k) match** - Free money first
+2. **HSA** - Triple tax advantage (if available)
+3. **Roth IRA** - Tax-free growth (perfect at age {age})
+4. **More 401(k)** - Additional tax-deferred savings
+
+**Investment Allocation:**
 - **Stocks:** ~{stock_percent}%
 - **Bonds:** ~{100-stock_percent}%
 
-**Simple approach:** Use target-date funds in your 401(k) - they automatically adjust over time.
+**Simple Approach:**
+- Use target-date funds (automatically adjusts over time)
+- Choose target date around 2065 for your age
 
-**DIY approach:** Low-cost index funds (total stock market + bond index)."""
+**DIY Approach:**
+- 70% Total Stock Market Index
+- 20% International Stock Index  
+- 10% Bond Index
+
+**Key Principles:**
+- Start aggressive while young (more stocks)
+- Keep fees low (under 0.5%)
+- Don't try to time the market
+- Automate everything
+
+**Quick decision:** If choosing between Roth IRA and HSA, pick HSA if you have a high-deductible health plan, otherwise Roth IRA."""
     
     # Emergency fund questions
     if any(word in input_lower for word in ['emergency', 'fund', 'savings account']):
@@ -442,25 +528,96 @@ Next step: Check if your employer offers HSA and 401(k) match."""
 
 **Monthly target:** Save $100-200/month until you reach your goal."""
     
-    # Default response for unmatched questions
-    return f"""**Let me help with your specific question**
+    # Career and income questions
+    if any(word in input_lower for word in ['career', 'job', 'income', 'raise', 'promotion', 'salary']):
+        return f"""**Career Growth Strategy for Age {age}:**
+
+**Income Growth Plan:**
+- Target 3-5% raises annually through performance
+- Consider job changes every 2-3 years for larger increases
+- Develop in-demand skills in your field
+- Network within your industry
+
+**Retirement Impact:**
+- Every $10K income increase = $100-150/month more for retirement
+- Career growth is often better than investment returns early on
+- Focus on both earning more AND saving more
+
+**Action Steps:**
+1. Track your accomplishments for review time
+2. Research market rates for your role
+3. Invest in skills training or certifications
+4. Update LinkedIn and resume regularly
+
+**Smart Moves:**
+- Increase 401(k) contribution with every raise
+- Don't let lifestyle inflation eat all income growth
+- Save at least 50% of any raise for retirement
+
+At age {age}, investing in your career can have the biggest impact on retirement readiness."""
+    
+    # General financial planning questions
+    if any(word in input_lower for word in ['financial plan', 'money plan', 'financial goals', 'financial advice']):
+        return f"""**Complete Financial Plan for Age {age}:**
+
+**Immediate Priorities (Next 6 months):**
+1. Build $1,000 emergency fund
+2. Get employer 401(k) match
+3. Pay minimums on all debts
+4. Track spending for one month
+
+**Short-term Goals (1-2 years):**
+1. Pay off high-interest debt (>6%)
+2. Build 3-month emergency fund
+3. Increase retirement savings to 10%
+4. Consider Roth IRA
+
+**Medium-term Goals (2-10 years):**
+1. Increase retirement savings to 15%
+2. Build 6-month emergency fund
+3. Pay off student loans
+4. Save for major purchases (house, etc.)
+
+**Long-term Goals (10+ years):**
+1. Max retirement accounts ($22,500 + $7,000)
+2. Build wealth through investments
+3. Plan for financial independence
+4. Consider early retirement options
+
+**Monthly Action Plan:**
+- Automate retirement savings
+- Review and optimize expenses
+- Invest in career growth
+- Monitor progress quarterly
+
+**Key Principle:** Start now, even with small amounts. Consistency beats perfection at age {age}."""
+    
+    # Default response - but much more helpful
+    return f"""**I can help with your question about: "{user_input}"**
 
 **Your profile:** Age {age}, Income {income}
 
-I want to give you a specific answer. Could you clarify:
+Based on your question, here's what I recommend:
 
-**For budgeting:** What's your monthly income and main expenses?
-**For debt:** What loans do you have and their interest rates?
-**For saving:** How much are you currently saving monthly?
-**For investing:** What accounts do you currently have?
+**If this is about retirement planning:**
+At age {age}, you have ~40 years until retirement. Even saving $200/month could grow to over $500,000. Start with employer 401(k) match, then Roth IRA.
 
-**Common questions I can help with:**
-- "Create a monthly budget for my income"
-- "Should I pay off student loans or save for retirement?"
-- "How much emergency fund do I need?"
-- "What's the best account for my situation?"
+**If this is about budgeting:**
+With {income} income, aim for 50% needs, 30% wants, 20% savings. Priority: emergency fund, then retirement.
 
-What specific financial question can I help you with?"""
+**If this is about debt:**
+Pay minimums on everything, get employer match, then attack highest interest rate debt first.
+
+**If this is about investing:**
+At age {age}, go aggressive: 80-90% stocks through index funds or target-date funds.
+
+**Want more specific advice?** Just ask:
+- "Create a retirement plan for my age"
+- "How should I budget my income?"
+- "What's my investment strategy?"
+- "How do I pay off debt faster?"
+
+What aspect would you like me to dive deeper into?"""
 
 def show_streamlined_form():
     """Streamlined onboarding form with only essential questions"""
