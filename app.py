@@ -354,15 +354,15 @@ def generate_fallback_response(user_input, user_profile):
     input_lower = user_input.lower()
     
     if any(word in input_lower for word in ["plan", "planning", "detailed", "strategy"]):
-        return f"""Based on your profile, here's a personalized retirement planning framework:
+        return f"""**Personalized Retirement Planning Framework**
 
-**Your Current Situation:**
+**Your Current Profile:**
 - Age: {user_profile.get('age', 'Not specified')}
 - Income Range: {user_profile.get('annual_income', 'Not specified')}
 - Current Savings: {user_profile.get('current_savings', 'Not specified')}
 - Target Retirement: Age {user_profile.get('target_retirement_age', 'Not specified')}
 
-**Recommended Action Steps:**
+**Action Plan Timeline:**
 
 **Immediate (This Month):**
 - Review your current retirement account contributions
@@ -379,7 +379,7 @@ def generate_fallback_response(user_input, user_profile):
 - Review beneficiaries on all accounts
 - Evaluate your overall debt strategy
 
-**Ongoing:**
+**Ongoing Strategy:**
 - Annual review of retirement goals and progress
 - Adjust contributions with salary increases
 - Monitor investment performance and rebalance as needed
@@ -388,16 +388,16 @@ Would you like me to elaborate on any specific aspect of this plan?"""
     
     elif any(word in input_lower for word in ["save", "saving", "contribution", "money"]):
         income = user_profile.get('annual_income', 'your income level')
-        return f"""**Savings Guidance for Your Situation:**
+        return f"""**Savings Strategy for Your Profile**
 
-**Based on your profile:**
+**Your Current Situation:**
 - Income: {income}
 - Current savings: {user_profile.get('current_savings', 'Not specified')}
 
-**General Savings Recommendations:**
+**Recommended Savings Approach:**
 - Aim to save 10-15% of your income for retirement
 - Start with getting full employer 401(k) match
-- Consider the "pay yourself first" approach with automatic deductions
+- Use the "pay yourself first" approach with automatic deductions
 
 **Monthly Savings Targets by Income:**
 - $30K-50K: $250-625/month
@@ -405,57 +405,59 @@ Would you like me to elaborate on any specific aspect of this plan?"""
 - $75K-100K: $625-1,250/month
 - $100K+: 10-15% of gross income
 
-**Next Steps:**
+**Implementation Steps:**
 1. Calculate your current savings rate
 2. Identify areas to reduce expenses
 3. Set up automatic transfers to retirement accounts
 
-What specific aspect of savings would you like to explore further?"""
+What specific aspect of savings strategy would you like to explore further?"""
     
     elif any(word in input_lower for word in ["invest", "investment", "portfolio", "risk"]):
         risk_tolerance = user_profile.get('risk_tolerance', 'moderate')
         age = user_profile.get('age', 35)
         
-        return f"""**Investment Strategy for Your Profile:**
+        return f"""**Investment Strategy for Your Profile**
 
-**Your Details:**
+**Your Investment Profile:**
 - Age: {age}
 - Risk Tolerance: {risk_tolerance}
 
-**General Asset Allocation Guidelines:**
+**Recommended Asset Allocation:**
 - **Conservative**: 70% bonds, 30% stocks
 - **Moderate**: 60% stocks, 40% bonds  
 - **Aggressive**: 80% stocks, 20% bonds
 
-**Age-Based Rule of Thumb:**
+**Age-Based Allocation Rule:**
 - Stock allocation = 100 - your age
 - At age {age}: Consider roughly {100-age}% stocks, {age}% bonds
 
-**Low-Cost Investment Options:**
+**Best Investment Options:**
 - Target-date funds (automatically adjusts over time)
 - Index funds (broad market exposure, low fees)
 - ETFs (exchange-traded funds)
 
-**Key Principles:**
+**Key Investment Principles:**
 - Diversification across asset classes
 - Keep investment fees low (under 0.5%)
-- Don't try to time the market
+- Avoid trying to time the market
 - Regular rebalancing (annually)
 
 Would you like more details about any of these investment approaches?"""
     
     else:
-        return """I'd be happy to help with your retirement planning question! Here are some areas I can assist with:
+        return """**Retirement Planning Guidance**
 
-**Popular Topics:**
-🎯 **Retirement Planning**: Create a personalized savings strategy
-💰 **Savings Goals**: Calculate how much to save monthly
-📊 **Investment Strategy**: Portfolio allocation for your age and risk tolerance
+Here are the key areas I can help you with:
+
+**Core Planning Topics:**
+🎯 **Retirement Strategy**: Personalized savings and investment approach
+💰 **Savings Goals**: Calculate optimal monthly contributions
+📊 **Investment Allocation**: Portfolio mix for your age and risk tolerance
 📈 **Catch-Up Planning**: Strategies if you're behind on savings
-🏥 **Healthcare Costs**: Planning for medical expenses in retirement
-📋 **Social Security**: Understanding benefits and timing
+🏥 **Healthcare Planning**: Medical expense preparation
+📋 **Social Security**: Benefits optimization and timing
 
-**Try asking:**
+**Popular Questions:**
 - "How much should I save each month for retirement?"
 - "What's the best investment mix for someone my age?"
 - "How can I catch up on retirement savings?"
