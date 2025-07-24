@@ -230,46 +230,45 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 def create_retirement_prompt_with_profile(user_profile):
     """Create a personalized prompt based on user profile data"""
-    base_prompt = """
-You are an expert Retirement Planning Coach providing personalized retirement planning suggestions.
+    base_prompt = """You are an expert Retirement Planning Coach providing personalized advice.
 
-USER PROFILE DATA:
-"""
+USER CONTEXT:"""
     
     if user_profile:
-        base_prompt += f"""
-- Age: {user_profile.get('age', 'Not specified')}
-- Career Stage: {user_profile.get('career_stage', 'Not specified')}
-- Current Retirement Savings: {user_profile.get('current_savings', 'Not specified')}
-- Monthly Contributions: {user_profile.get('monthly_contributions', 'Not specified')}
-- Target Retirement Age: {user_profile.get('target_retirement_age', 'Not specified')}
-- Target Retirement Savings: {user_profile.get('target_savings', 'Not specified')}
-- Annual Income: {user_profile.get('annual_income', 'Not specified')}
-- Current Debt: {user_profile.get('current_debt', 'Not specified')}
-- Investment Experience: {user_profile.get('investment_experience', 'Not specified')}
-- Risk Tolerance: {user_profile.get('risk_tolerance', 'Not specified')}
-- Employment Status: {user_profile.get('employment_status', 'Not specified')}
-- Family Status: {user_profile.get('family_status', 'Not specified')}
-- Main Challenges: {user_profile.get('main_challenges', 'Not specified')}
-- Primary Goals: {user_profile.get('primary_goals', 'Not specified')}
-"""
+        # Create a more concise profile summary to avoid safety filter issues
+        profile_summary = []
+        
+        if user_profile.get('age'):
+            profile_summary.append(f"Age {user_profile['age']}")
+        if user_profile.get('career_stage'):
+            profile_summary.append(f"Career: {user_profile['career_stage']}")
+        if user_profile.get('annual_income'):
+            profile_summary.append(f"Income: {user_profile['annual_income']}")
+        if user_profile.get('current_savings'):
+            profile_summary.append(f"Current savings: {user_profile['current_savings']}")
+        if user_profile.get('target_retirement_age'):
+            profile_summary.append(f"Target retirement age: {user_profile['target_retirement_age']}")
+        if user_profile.get('risk_tolerance'):
+            profile_summary.append(f"Risk tolerance: {user_profile['risk_tolerance']}")
+        if user_profile.get('primary_goals'):
+            goals = user_profile['primary_goals'][:100]  # Limit length
+            profile_summary.append(f"Goals: {goals}")
+        
+        base_prompt += f"\n{', '.join(profile_summary[:6])}"  # Limit to 6 key items
     
     base_prompt += """
 
 INSTRUCTIONS:
-* Use the user profile data above to provide highly personalized retirement planning advice
-* Reference specific details from their profile in your responses
-* Tailor all recommendations based on their age, income, savings, and goals
-* If you need additional information beyond the profile, ask specific clarifying questions
-* Focus on actionable advice based on their current situation and goals
-* Be encouraging and maintain a professional, supportive tone
-* Keep context across the conversation, ensuring ideas relate to their specific profile
-* If asked about plans or definitions, provide credible sources for verification
-* At the end of conversations, ask for feedback using thumbs up or down
+- Provide personalized retirement planning advice based on the user context above
+- Give specific, actionable recommendations
+- Reference their age, income, and goals when relevant
+- Be encouraging and professional
+- Include credible sources when discussing financial concepts
+- Ask clarifying questions if you need more specific information
 
-Knowledge Sources:
-- https://2025-benefits.segalco.com/
-- https://www.psca.org/news/psca-news/
+KNOWLEDGE SOURCES:
+- Segal Benefits: https://2025-benefits.segalco.com/
+- PSCA News: https://www.psca.org/news/psca-news/
 """
     
     return base_prompt
@@ -278,24 +277,101 @@ def get_ai_response(user_input, conversation_history, user_profile):
     try:
         model = genai.GenerativeModel('gemini-2.5-flash')
         
-        # Build conversation context with profile
-        context = create_retirement_prompt_with_profile(user_profile) + "\n\nConversation History:\n"
-        for msg in conversation_history[-10:]:  # Keep last 10 messages for context
+        # Build conversation context with simplified profile
+        context = create_retirement_prompt_with_profile(user_profile) + "\n\nCONVERSATION:\n"
+        
+        # Keep only last 5 messages to avoid token limits
+        recent_history = conversation_history[-5:] if conversation_history else []
+        for msg in recent_history:
             role = "User" if msg["role"] == "user" else "Assistant"
-            context += f"{role}: {msg['content']}\n"
+            context += f"{role}: {msg['content'][:200]}...\n"  # Limit message length
         
         context += f"\nUser: {user_input}\nAssistant:"
+        
+        # Add safety settings to handle potential blocks
+        safety_settings = [
+            {
+                "category": "HARM_CATEGORY_HARASSMENT",
+                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                "category": "HARM_CATEGORY_HATE_SPEECH",
+                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+        ]
         
         response = model.generate_content(
             context,
             generation_config=genai.types.GenerationConfig(
-                max_output_tokens=1000,
+                max_output_tokens=800,  # Reduced to avoid issues
                 temperature=0.7,
-            )
+            ),
+            safety_settings=safety_settings
         )
-        return response.text
+        
+        # Check if response was blocked
+        if response.candidates and response.candidates[0].finish_reason == 2:
+            return """I apologize, but I need to rephrase my response. Let me provide you with some general retirement planning guidance:
+
+**Personalized Retirement Planning Steps:**
+
+1. **Assessment**: Based on your profile, let's review your current savings rate and timeline.
+
+2. **Goal Setting**: With your target retirement age, we can calculate how much you need to save monthly.
+
+3. **Investment Strategy**: Given your risk tolerance, I can recommend appropriate investment allocations.
+
+4. **Action Plan**: 
+   - Immediate: Review and optimize current contributions
+   - Next 3 months: Set up automatic savings increases
+   - Next 6 months: Diversify investment portfolio
+   - Ongoing: Annual reviews and adjustments
+
+Could you ask me about a specific aspect of retirement planning? For example:
+- "How much should I save monthly for retirement?"
+- "What investment mix is right for my age?"
+- "How can I catch up on retirement savings?"
+
+This will help me provide more targeted advice for your situation."""
+        
+        # Return the response text if available
+        if response.text:
+            return response.text
+        else:
+            return "I'm having trouble generating a complete response. Could you try asking about a specific aspect of retirement planning instead?"
+            
     except Exception as e:
-        return f"I apologize, but I'm having trouble connecting to the AI service. Error: {str(e)}"
+        # Enhanced error handling with helpful fallback
+        if "finish_reason" in str(e) or "safety" in str(e).lower():
+            return """I apologize, but I need to approach your question differently. Let me provide some general retirement planning guidance:
+
+**Key Retirement Planning Areas:**
+
+🎯 **Savings Strategy**: Most experts recommend saving 10-15% of your income for retirement.
+
+📊 **Investment Allocation**: Your investment mix should align with your age and risk tolerance.
+
+⏰ **Timeline Planning**: The earlier you start, the more compound interest works in your favor.
+
+💡 **Action Steps**: Start with maximizing any employer 401(k) match, then consider additional savings.
+
+**Let's focus on specifics - what would you like to explore?**
+- Savings rate calculations
+- Investment strategy for your age
+- Debt management while saving
+- Social Security planning
+
+This will help me give you more targeted advice for your situation."""
+        else:
+            return f"I'm experiencing a technical issue connecting to the AI service. Please try refreshing the page or asking your question in a different way. Error details: {str(e)[:100]}"
 
 def show_onboarding_form():
     """Display the onboarding form to collect user profile information"""
