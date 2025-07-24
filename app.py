@@ -69,6 +69,62 @@ st.markdown("""
         font-weight: 600;
     }
     
+    /* Form styling */
+    .form-container {
+        background: white;
+        border: 1px solid #e1e8ed;
+        border-radius: 12px;
+        padding: 2rem;
+        margin: 1rem 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .form-section {
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .form-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+    
+    .form-section h4 {
+        color: #1f4e79;
+        margin-bottom: 1rem;
+        font-weight: 600;
+    }
+    
+    /* Profile summary styling */
+    .profile-summary {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 1px solid #dee2e6;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+    }
+    
+    .profile-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .profile-item:last-child {
+        border-bottom: none;
+    }
+    
+    .profile-label {
+        font-weight: 600;
+        color: #1f4e79;
+    }
+    
+    .profile-value {
+        color: #495057;
+    }
+    
     /* Sidebar styling */
     .css-1d391kg {
         background-color: #f8f9fa;
@@ -172,41 +228,58 @@ st.markdown("""
 
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-RETIREMENT_COACH_PROMPT = """
+def create_retirement_prompt_with_profile(user_profile):
+    """Create a personalized prompt based on user profile data"""
+    base_prompt = """
 You are an expert Retirement Planning Coach providing personalized retirement planning suggestions.
 
-Goals:
-* Getting to know the user: Start by asking about their current age and what stage of their career they are in (early career, mid-career, late career, near retirement, etc.). This helps personalize all advice.
-* Understand the user's current retirement plan: use available data to learn about their plan. Tailor advice based on this information. Ask the user to describe their plan, savings, challenges, and debt.
-* Identify retirement goals: ask about short-term and long-term goals. What age of retirement are they planning for? How much do they want to have saved at time of retirement?
-* Assess skills and gaps: evaluate current skills and identify gaps to achieve career goals to achieve their priorities.
-* Suggest learning opportunities: recommend courses, certifications, workshops, or other learning opportunities to acquire necessary skills.
-* Create a plan of action: develop a step-by-step plan with actions, timelines, and milestone. If asked for a detailed plan, include immediate actions, next 3 months, next 6 months, next 1-2 years, and ongoing.
-* Plan finalization: Once user expresses satisfaction in plan, ask the user if they wish the AI to create a printable professional document outlining their Plan of Action.
-
-Overall direction:
-* Make responses relevant to the user's current or desired plan
-* Avoid overwhelming the user with multiple questions at one
-* Ask clarifying and follow-up questions
-* Be encouraging and maintain a professional, supportive tone
-* Keep context across the conversation, ensuring ideas and responses relate to previous turns
-* After each subtopic, ask if the user has follow-up questions or needs further help
-* If greeted or asked what you can do, briefly explain your purpose with concise examples, then ask about their age and career stage to personalize your advice
-* If asked unrelated questions, answer but try to refocus on retirement planning, financial wellness, and financial 101 questions.
-* If asked about what certain plans are and their definition, or if you pull any information from a source, make sure it is credible and to have a little source link so that they can verify that your information is certifiable and correct
-* At the end of each conversation, ask how you did and encourage feedback using the thumbs up or down.
-
-Knowledge:
-Https://2025-benefits.segalco.com/
-Https://www.psca.org/news/psca-news/
+USER PROFILE DATA:
 """
+    
+    if user_profile:
+        base_prompt += f"""
+- Age: {user_profile.get('age', 'Not specified')}
+- Career Stage: {user_profile.get('career_stage', 'Not specified')}
+- Current Retirement Savings: {user_profile.get('current_savings', 'Not specified')}
+- Monthly Contributions: {user_profile.get('monthly_contributions', 'Not specified')}
+- Target Retirement Age: {user_profile.get('target_retirement_age', 'Not specified')}
+- Target Retirement Savings: {user_profile.get('target_savings', 'Not specified')}
+- Annual Income: {user_profile.get('annual_income', 'Not specified')}
+- Current Debt: {user_profile.get('current_debt', 'Not specified')}
+- Investment Experience: {user_profile.get('investment_experience', 'Not specified')}
+- Risk Tolerance: {user_profile.get('risk_tolerance', 'Not specified')}
+- Employment Status: {user_profile.get('employment_status', 'Not specified')}
+- Family Status: {user_profile.get('family_status', 'Not specified')}
+- Main Challenges: {user_profile.get('main_challenges', 'Not specified')}
+- Primary Goals: {user_profile.get('primary_goals', 'Not specified')}
+"""
+    
+    base_prompt += """
 
-def get_ai_response(user_input, conversation_history):
+INSTRUCTIONS:
+* Use the user profile data above to provide highly personalized retirement planning advice
+* Reference specific details from their profile in your responses
+* Tailor all recommendations based on their age, income, savings, and goals
+* If you need additional information beyond the profile, ask specific clarifying questions
+* Focus on actionable advice based on their current situation and goals
+* Be encouraging and maintain a professional, supportive tone
+* Keep context across the conversation, ensuring ideas relate to their specific profile
+* If asked about plans or definitions, provide credible sources for verification
+* At the end of conversations, ask for feedback using thumbs up or down
+
+Knowledge Sources:
+- https://2025-benefits.segalco.com/
+- https://www.psca.org/news/psca-news/
+"""
+    
+    return base_prompt
+
+def get_ai_response(user_input, conversation_history, user_profile):
     try:
         model = genai.GenerativeModel('gemini-2.5-flash')
         
-        # Build conversation context
-        context = RETIREMENT_COACH_PROMPT + "\n\nConversation History:\n"
+        # Build conversation context with profile
+        context = create_retirement_prompt_with_profile(user_profile) + "\n\nConversation History:\n"
         for msg in conversation_history[-10:]:  # Keep last 10 messages for context
             role = "User" if msg["role"] == "user" else "Assistant"
             context += f"{role}: {msg['content']}\n"
@@ -224,7 +297,239 @@ def get_ai_response(user_input, conversation_history):
     except Exception as e:
         return f"I apologize, but I'm having trouble connecting to the AI service. Error: {str(e)}"
 
+def show_onboarding_form():
+    """Display the onboarding form to collect user profile information"""
+    st.markdown("""
+    <div class="main-header">
+        <h1>Welcome to RetireChat</h1>
+        <p>Let's create your personalized retirement planning profile</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="form-container">
+        <h3 style="color: #1f4e79; margin-top: 0;">Personal Retirement Assessment</h3>
+        <p>Please fill out this form so I can provide you with personalized retirement planning advice. All information is kept confidential and used only to tailor recommendations to your specific situation.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.form("retirement_profile_form"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown('<div class="form-section"><h4>👤 Personal Information</h4>', unsafe_allow_html=True)
+            age = st.number_input("Current Age", min_value=18, max_value=100, value=35)
+            career_stage = st.selectbox("Career Stage", [
+                "Early Career (0-5 years experience)",
+                "Mid-Career (5-15 years experience)", 
+                "Senior Career (15+ years experience)",
+                "Near Retirement (5 years or less)",
+                "Already Retired"
+            ])
+            employment_status = st.selectbox("Employment Status", [
+                "Full-time Employee",
+                "Part-time Employee",
+                "Self-employed/Freelancer",
+                "Business Owner",
+                "Unemployed",
+                "Retired"
+            ])
+            family_status = st.selectbox("Family Status", [
+                "Single, no dependents",
+                "Married/Partnered, no children",
+                "Married/Partnered with children",
+                "Single parent",
+                "Supporting elderly parents",
+                "Other"
+            ])
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown('<div class="form-section"><h4>💰 Financial Information</h4>', unsafe_allow_html=True)
+            annual_income = st.selectbox("Annual Income", [
+                "Under $30,000",
+                "$30,000 - $50,000",
+                "$50,000 - $75,000",
+                "$75,000 - $100,000",
+                "$100,000 - $150,000",
+                "$150,000 - $250,000",
+                "Over $250,000"
+            ])
+            current_savings = st.selectbox("Current Retirement Savings", [
+                "No savings yet",
+                "Under $10,000",
+                "$10,000 - $50,000",
+                "$50,000 - $100,000",
+                "$100,000 - $250,000",
+                "$250,000 - $500,000",
+                "$500,000 - $1,000,000",
+                "Over $1,000,000"
+            ])
+            monthly_contributions = st.selectbox("Monthly Retirement Contributions", [
+                "Not contributing yet",
+                "Under $200",
+                "$200 - $500",
+                "$500 - $1,000",
+                "$1,000 - $2,000",
+                "Over $2,000"
+            ])
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown('<div class="form-section"><h4>🎯 Goals & Timeline</h4>', unsafe_allow_html=True)
+            target_retirement_age = st.number_input("Target Retirement Age", min_value=50, max_value=80, value=65)
+            target_savings = st.selectbox("Target Retirement Savings Goal", [
+                "Not sure yet",
+                "$500,000 - $1,000,000",
+                "$1,000,000 - $2,000,000",
+                "$2,000,000 - $5,000,000",
+                "Over $5,000,000"
+            ])
+            primary_goals = st.multiselect("Primary Retirement Goals", [
+                "Maintain current lifestyle",
+                "Travel extensively",
+                "Support family/children",
+                "Start a business",
+                "Volunteer/charity work",
+                "Healthcare security",
+                "Leave an inheritance",
+                "Early retirement"
+            ])
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown('<div class="form-section"><h4>📊 Experience & Risk</h4>', unsafe_allow_html=True)
+            investment_experience = st.selectbox("Investment Experience", [
+                "Beginner - little to no experience",
+                "Basic - some knowledge of investments",
+                "Intermediate - moderate experience",
+                "Advanced - extensive experience"
+            ])
+            risk_tolerance = st.selectbox("Risk Tolerance", [
+                "Conservative - prefer stable, low-risk investments",
+                "Moderate - willing to accept some risk for potential growth",
+                "Aggressive - comfortable with high-risk, high-reward investments"
+            ])
+            current_debt = st.selectbox("Current Debt Level", [
+                "No significant debt",
+                "Some credit card debt",
+                "Student loans",
+                "Mortgage only",
+                "Multiple debts (credit cards, loans, etc.)",
+                "High debt burden"
+            ])
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.markdown('<div class="form-section"><h4>🤔 Challenges & Concerns</h4>', unsafe_allow_html=True)
+        main_challenges = st.multiselect("Main Retirement Planning Challenges", [
+            "Don't know where to start",
+            "Not saving enough",
+            "Understanding investment options",
+            "Balancing current expenses with saving",
+            "Managing debt while saving",
+            "Healthcare costs in retirement",
+            "Social Security uncertainty",
+            "Market volatility concerns",
+            "Inflation impact",
+            "Estate planning"
+        ])
+        additional_info = st.text_area("Additional Information or Specific Questions", 
+                                     placeholder="Any other details about your situation or specific questions you'd like addressed...")
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        submitted = st.form_submit_button("Create My Retirement Profile", use_container_width=True)
+        
+        if submitted:
+            # Store profile in session state
+            st.session_state.user_profile = {
+                'age': age,
+                'career_stage': career_stage,
+                'employment_status': employment_status,
+                'family_status': family_status,
+                'annual_income': annual_income,
+                'current_savings': current_savings,
+                'monthly_contributions': monthly_contributions,
+                'target_retirement_age': target_retirement_age,
+                'target_savings': target_savings,
+                'primary_goals': ', '.join(primary_goals) if primary_goals else 'Not specified',
+                'investment_experience': investment_experience,
+                'risk_tolerance': risk_tolerance,
+                'current_debt': current_debt,
+                'main_challenges': ', '.join(main_challenges) if main_challenges else 'Not specified',
+                'additional_info': additional_info
+            }
+            st.session_state.profile_complete = True
+            st.success("✅ Profile created successfully! You can now start chatting with your AI retirement coach.")
+            st.rerun()
+
+def show_profile_summary(user_profile):
+    """Display a summary of the user's profile"""
+    st.markdown("""
+    <div class="profile-summary">
+        <h4 style="color: #1f4e79; margin-top: 0;">📋 Your Retirement Profile</h4>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown(f"""
+        <div class="profile-item">
+            <span class="profile-label">Age:</span>
+            <span class="profile-value">{user_profile.get('age', 'N/A')}</span>
+        </div>
+        <div class="profile-item">
+            <span class="profile-label">Career Stage:</span>
+            <span class="profile-value">{user_profile.get('career_stage', 'N/A')}</span>
+        </div>
+        <div class="profile-item">
+            <span class="profile-label">Current Savings:</span>
+            <span class="profile-value">{user_profile.get('current_savings', 'N/A')}</span>
+        </div>
+        <div class="profile-item">
+            <span class="profile-label">Monthly Contributions:</span>
+            <span class="profile-value">{user_profile.get('monthly_contributions', 'N/A')}</span>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div class="profile-item">
+            <span class="profile-label">Target Retirement Age:</span>
+            <span class="profile-value">{user_profile.get('target_retirement_age', 'N/A')}</span>
+        </div>
+        <div class="profile-item">
+            <span class="profile-label">Target Savings:</span>
+            <span class="profile-value">{user_profile.get('target_savings', 'N/A')}</span>
+        </div>
+        <div class="profile-item">
+            <span class="profile-label">Risk Tolerance:</span>
+            <span class="profile-value">{user_profile.get('risk_tolerance', 'N/A')}</span>
+        </div>
+        <div class="profile-item">
+            <span class="profile-label">Investment Experience:</span>
+            <span class="profile-value">{user_profile.get('investment_experience', 'N/A')}</span>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
 def main():
+    # Initialize session state
+    if "conversation_history" not in st.session_state:
+        st.session_state.conversation_history = []
+    
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    
+    if "profile_complete" not in st.session_state:
+        st.session_state.profile_complete = False
+    
+    if "user_profile" not in st.session_state:
+        st.session_state.user_profile = {}
+    
+    # Show onboarding form if profile not complete
+    if not st.session_state.profile_complete:
+        show_onboarding_form()
+        return
+    
     # Navigation Bar
     st.markdown("""
     <div class="nav-container">
@@ -242,16 +547,9 @@ def main():
     st.markdown("""
     <div class="main-header">
         <h1>AI Retirement Planning Coach</h1>
-        <p>Delivering trusted advice that improves lives through personalized retirement planning</p>
+        <p>Delivering personalized advice based on your retirement profile</p>
     </div>
     """, unsafe_allow_html=True)
-    
-    # Initialize session state
-    if "conversation_history" not in st.session_state:
-        st.session_state.conversation_history = []
-    
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
     
     # Main content area
     col1, col2 = st.columns([2, 1])
@@ -261,7 +559,7 @@ def main():
         st.markdown("""
         <div class="feature-card">
             <h3>🤖 AI Retirement Planning Assistant</h3>
-            <p>Get personalized answers to your retirement planning questions, powered by expert financial guidance</p>
+            <p>Get personalized answers based on your retirement profile and goals</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -279,8 +577,8 @@ def main():
                 st.markdown(prompt)
             
             with st.chat_message("assistant"):
-                with st.spinner("Analyzing your question..."):
-                    response = get_ai_response(prompt, st.session_state.conversation_history)
+                with st.spinner("Analyzing your question based on your profile..."):
+                    response = get_ai_response(prompt, st.session_state.conversation_history, st.session_state.user_profile)
                     st.markdown(response)
             
             st.session_state.messages.append({"role": "assistant", "content": response})
@@ -288,28 +586,28 @@ def main():
             st.session_state.conversation_history.append({"role": "assistant", "content": response})
     
     with col2:
-        # Sidebar Features
-        st.markdown("""
-        <div class="feature-card">
-            <h3>📊 Planning Tools</h3>
-            <p>Access comprehensive financial calculators and projection tools</p>
-        </div>
-        """, unsafe_allow_html=True)
+        # Profile Summary
+        show_profile_summary(st.session_state.user_profile)
+        
+        # Update Profile Button
+        if st.button("✏️ Update Profile", use_container_width=True):
+            st.session_state.profile_complete = False
+            st.rerun()
         
         # Quick Actions
         st.markdown("### Quick Start Guides")
         
-        if st.button("🎯 Create Retirement Plan", use_container_width=True):
-            st.session_state.suggested_prompt = "Help me create a detailed retirement development plan based on my current financial situation and future goals."
+        if st.button("🎯 Personalized Retirement Plan", use_container_width=True):
+            st.session_state.suggested_prompt = "Based on my profile, create a detailed personalized retirement plan with specific action steps."
         
-        if st.button("📈 Skills Gap Analysis", use_container_width=True):
-            st.session_state.suggested_prompt = "Analyze my current skills and identify any gaps that I need to fill to advance in my career."
+        if st.button("📈 Investment Strategy", use_container_width=True):
+            st.session_state.suggested_prompt = "Given my risk tolerance and goals, what investment strategy would you recommend?"
         
-        if st.button("📚 Learning Resources", use_container_width=True):
-            st.session_state.suggested_prompt = "What courses, certifications, or workshops would you recommend for someone in my generation to plan retirement successfully?"
+        if st.button("💰 Savings Optimization", use_container_width=True):
+            st.session_state.suggested_prompt = "How can I optimize my current savings and contributions based on my income and goals?"
         
-        if st.button("💡 Financial Education", use_container_width=True):
-            st.session_state.suggested_prompt = "Explain the basics of retirement planning and what I should know to get started."
+        if st.button("🔮 Retirement Projections", use_container_width=True):
+            st.session_state.suggested_prompt = "Show me projections of my retirement readiness and what adjustments I might need to make."
         
         # Stats
         st.markdown("""
@@ -347,8 +645,8 @@ def main():
             st.markdown(prompt)
         
         with st.chat_message("assistant"):
-            with st.spinner("Analyzing your question..."):
-                response = get_ai_response(prompt, st.session_state.conversation_history)
+            with st.spinner("Analyzing your question based on your profile..."):
+                response = get_ai_response(prompt, st.session_state.conversation_history, st.session_state.user_profile)
                 st.markdown(response)
         
         st.session_state.messages.append({"role": "assistant", "content": response})
