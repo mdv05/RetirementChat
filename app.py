@@ -55,16 +55,62 @@ def get_ai_response(user_input, conversation_history):
         
         context += f"\nUser: {user_input}\nAssistant:"
         
+        # Configure safety settings to be less restrictive for financial advice
+        safety_settings = [
+            {
+                "category": "HARM_CATEGORY_HARASSMENT",
+                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                "category": "HARM_CATEGORY_HATE_SPEECH",
+                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+        ]
+        
         response = model.generate_content(
             context,
             generation_config=genai.types.GenerationConfig(
                 max_output_tokens=1000,
                 temperature=0.7,
-            )
+                top_p=0.8,
+                top_k=40
+            ),
+            safety_settings=safety_settings
         )
-        return response.text
+        
+        # Check if response was blocked
+        if response.candidates:
+            candidate = response.candidates[0]
+            if candidate.finish_reason == 2:  # SAFETY
+                return "I apologize, but I need to be careful with my responses. Could you please rephrase your question about retirement planning? I'm here to help with financial planning, retirement strategies, and career development advice."
+            elif candidate.finish_reason == 3:  # RECITATION
+                return "I apologize for the technical issue. Let me provide you with personalized retirement planning advice. Could you tell me more about your current financial situation or retirement goals?"
+            elif candidate.finish_reason == 4:  # OTHER
+                return "I'm experiencing a technical issue. Let me help you with your retirement planning. What specific aspect of retirement planning would you like to discuss?"
+        
+        # Try to get the response text safely
+        if hasattr(response, 'text') and response.text:
+            return response.text
+        elif response.candidates and len(response.candidates) > 0:
+            candidate = response.candidates[0]
+            if hasattr(candidate, 'content') and candidate.content:
+                if hasattr(candidate.content, 'parts') and candidate.content.parts:
+                    return candidate.content.parts[0].text
+        
+        # Fallback response
+        return "Thank you for your question about retirement planning. I'm here to help you create a comprehensive retirement strategy. Could you tell me about your current age, career stage, and any specific retirement planning goals you have?"
+        
     except Exception as e:
-        return f"I apologize, but I'm having trouble connecting to the AI service. Error: {str(e)}"
+        st.error(f"API Error Details: {str(e)}")
+        return "I'm experiencing a temporary connection issue. In the meantime, I'd be happy to help you think through your retirement planning needs. What aspects of retirement planning are most important to you right now?"
 
 def main():
     # Professional header styling
