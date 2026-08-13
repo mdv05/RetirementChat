@@ -14,7 +14,25 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+def _get_api_key():
+    # Works both locally / on Cloud Run (env var) and on Streamlit Community Cloud (st.secrets)
+    key = os.getenv("GOOGLE_API_KEY")
+    if key:
+        return key
+    try:
+        return st.secrets["GOOGLE_API_KEY"]
+    except Exception:
+        return None
+
+GOOGLE_API_KEY = _get_api_key()
+if not GOOGLE_API_KEY:
+    st.error(
+        "Missing GOOGLE_API_KEY. Add it under your app's Settings → Secrets "
+        "(format: GOOGLE_API_KEY = \"your-key\") and rerun."
+    )
+    st.stop()
+
+genai.configure(api_key=GOOGLE_API_KEY)
 
 RETIREMENT_COACH_PROMPT = """
 You are an expert Retirement Planning Coach providing personalized retirement planning suggestions.
