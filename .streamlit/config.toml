@@ -3,9 +3,3 @@ primaryColor = "#2B5A9E"
 backgroundColor = "#FFFFFF"
 secondaryBackgroundColor = "#F8F9FA"
 textColor = "#1E1E1E"
-
-[server]
-headless = true
-port = 8080
-enableCORS = false
-enableXsrfProtection = false
