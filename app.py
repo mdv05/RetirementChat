@@ -120,7 +120,7 @@ def get_ai_response_with_retry(user_input, conversation_history, max_retries=3):
 def get_ai_response_attempt(user_input, conversation_history, attempt_number):
     """Single attempt to get AI response with different configurations per attempt"""
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-flash-latest')
         
         # Build conversation context
         context = RETIREMENT_COACH_PROMPT + "\n\nConversation History:\n"
