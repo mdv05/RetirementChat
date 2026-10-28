@@ -3,7 +3,6 @@ import google.generativeai as genai
 import os
 from dotenv import load_dotenv
 import time
-import re
 
 load_dotenv()
 
@@ -63,45 +62,12 @@ Https://2025-benefits.segalco.com/
 Https://www.psca.org/news/psca-news/
 """
 
-def sanitize_input(user_input):
-    """Sanitize user input to avoid triggering safety filters"""
-    # Remove potentially problematic phrases that might trigger safety filters
-    sanitized = user_input
-    
-    # Replace common financial terms that might trigger filters
-    replacements = {
-        r'\bdebts?\b': 'financial obligations',
-        r'\bbankrupt(cy)?\b': 'financial restructuring',
-        r'\bfail(ed|ure)?\b': 'challenging situation',
-        r'\bcrisis\b': 'difficult period',
-        r'\bstrug(gle|gling)\b': 'working through challenges',
-        r'\bdesperate\b': 'urgently seeking',
-        r'\bpoor\b': 'limited financial resources',
-        r'\bbroke\b': 'financially constrained'
-    }
-    
-    for pattern, replacement in replacements.items():
-        sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
-    
-    return sanitized
-
 def get_ai_response_with_retry(user_input, conversation_history, max_retries=3):
-    """Get AI response with multiple retry strategies to bypass safety filters"""
+    """Get AI response, retrying a few times on transient API errors"""
     
-    # Strategy 1: Try with sanitized input and most permissive settings
     for attempt in range(max_retries):
         try:
-            if attempt == 0:
-                # First attempt: Use original input with most permissive settings
-                processed_input = user_input
-            elif attempt == 1:
-                # Second attempt: Use sanitized input
-                processed_input = sanitize_input(user_input)
-            else:
-                # Third attempt: Rephrase as a professional consultation
-                processed_input = f"As a retirement planning professional, please provide guidance on: {sanitize_input(user_input)}"
-            
-            response = get_ai_response_attempt(processed_input, conversation_history, attempt)
+            response = get_ai_response_attempt(user_input, conversation_history, attempt)
             
             if response and not response.startswith("I apologize"):
                 return response
@@ -130,26 +96,6 @@ def get_ai_response_attempt(user_input, conversation_history, attempt_number):
         
         context += f"\nUser: {user_input}\nAssistant:"
         
-        # Most permissive safety settings possible
-        safety_settings = [
-            {
-                "category": "HARM_CATEGORY_HARASSMENT",
-                "threshold": "BLOCK_NONE"
-            },
-            {
-                "category": "HARM_CATEGORY_HATE_SPEECH", 
-                "threshold": "BLOCK_NONE"
-            },
-            {
-                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                "threshold": "BLOCK_NONE"
-            },
-            {
-                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-                "threshold": "BLOCK_NONE"
-            }
-        ]
-        
         # Adjust generation config based on attempt
         if attempt_number == 0:
             gen_config = genai.types.GenerationConfig(
@@ -175,8 +121,7 @@ def get_ai_response_attempt(user_input, conversation_history, attempt_number):
         
         response = model.generate_content(
             context,
-            generation_config=gen_config,
-            safety_settings=safety_settings
+            generation_config=gen_config
         )
         
         # Enhanced response extraction with multiple fallback methods
@@ -213,10 +158,10 @@ def extract_response_safely(response, original_input):
                 pass
         
         elif finish_reason == 2:  # SAFETY
-            return generate_safety_bypass_response(original_input)
+            return generate_blocked_response(original_input)
         
         elif finish_reason == 3:  # RECITATION
-            return generate_recitation_bypass_response(original_input)
+            return generate_recitation_response(original_input)
         
         elif finish_reason == 4:  # OTHER
             return generate_other_error_response(original_input)
@@ -236,8 +181,8 @@ def extract_response_safely(response, original_input):
     
     return None
 
-def generate_safety_bypass_response(original_input):
-    """Generate a helpful response when safety filters are triggered"""
+def generate_blocked_response(original_input):
+    """Friendly fallback when a response is blocked, so the user still gets help"""
     financial_keywords = ['retirement', 'savings', 'investment', 'financial', 'money', 'plan', 'budget', 'debt', 'income']
     
     if any(keyword in original_input.lower() for keyword in financial_keywords):
@@ -270,7 +215,7 @@ Based on your inquiry, I can provide guidance on:
 
 What specific aspect of retirement planning would you like to focus on today?"""
 
-def generate_recitation_bypass_response(original_input):
+def generate_recitation_response(original_input):
     """Generate response when recitation filters are triggered"""
     return """I'd be happy to provide original, personalized retirement planning advice tailored to your specific situation.
 
